@@ -20,6 +20,15 @@
 
 ---
 
+# Usage Details
+It is advised to load the `Rmd` file in VSCode with an extension to preview the `Rmd` file or in R studio as this is an R notebook. Make sure to put the csv file in the same directory. 
+
+1. You can clone the repository by following the command
+   ```bash
+   git clone https://github.com/Samia35-2973/New-York-City-Airbnb-2019-Statistical-Data-Analysis-with-R.git
+   ```
+2. Then open the directory on VSCode with R Markdown or Just open the `Rmd` file in R Studio.
+
 # Airbnb NYC 2019 Data Analysis
 
 ## Overview
