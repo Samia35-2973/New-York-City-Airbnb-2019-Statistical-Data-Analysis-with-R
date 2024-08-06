@@ -1,0 +1,2 @@
+# New-York-City-Airbnb-2019-Statistical-Data-Analysis-with-R
+delves into the New York City Airbnb Open Data for 2019, examining 48,895 entries across 16 features. Employing descriptive statistics and data visualization, the analysis focuses on host distribution among areas. This exploration provides foundational insights into the Airbnb landscape in New York City, serving as a basis for further research.
