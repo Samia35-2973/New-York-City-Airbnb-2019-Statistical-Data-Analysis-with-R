@@ -1,0 +1,702 @@
+---
+title: "Lab Final"
+author: "Samia Haque Tisha"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+    theme: united
+    highlight: tango
+---
+
+# Student Information
+
+**Name:** Samia Haque Tisha
+
+**ID:** 201 - 35 - 2973
+
+**Section:** 32 - A
+
+# Set Up
+
+R set up and necessary files importing goes here
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(hrbrthemes)
+library(viridis)
+library(dplyr)
+library(e1071)
+library(reshape2)
+```
+
+# UNDERSTANDING AND ANALYSIS
+
+## I. Dataset Loading
+
+Download the New York Airbnb Dataset from <https://www.kaggle.com/datasets/dgomonov/new-york-city-airbnb-open-data> and load it into R DataFrame.
+
+-   Loading the "**New York City Airbnb"** csvdataset into *data* dataframe
+
+```{r}
+# Loading csv dataset to data dataframe
+data <- read.csv("AB_NYC_2019.csv")
+```
+
+## Dataset Understanding
+
+-   Viewing first 5 rows of the data set
+
+    ```{r}
+    # Printing first 5 rows of the dataset
+    head(data)
+    ```
+
+-   Viewing last 5 rows of the data set
+
+    ```{r}
+    # Printing last 5 rows of the dataset
+    tail(data)
+    ```
+
+-   Dimension of Data
+
+    ```{r}
+    # Number of rows and columns
+    dim(data)
+    ```
+
+    ## Numeric and categorical features
+
+    ```{r}
+    # Seperating numeric and categorical variables
+    numerical_columns <- sapply(data, is.numeric)
+    categorical_columns <- sapply(data, is.character) | sapply(data, is.factor)
+
+    # Print the names of numerical columns
+    cat("Numerical Columns\n")
+    print(names(data[, numerical_columns]))
+
+    cat("\n\nCategorical Columns\n")
+    # Print the names of categorical columns
+    print(names(data[, categorical_columns]))
+    ```
+
+    From the output we can got the type of the variables
+
+    **Discrete Numerical Variables**: *id, host_id, price, minimum_nights, number_of_reviews, calculated_host_listings_count, availability_365*
+
+    **Continuous Numerical Variables**: *latitude, longitude, reviews_per_month*
+
+    **Nominal Categorical Variables**: *name, host_name, neighbourhood_group, neighbourhood, room_type*
+
+    **Ordinal Categorical Variables**: *last_review*
+
+    However there are some useless variables which will be rarely used. Because those are identifier and they will be meaningless for the analysis. Those are - *id, host_id, name, host_name, last_review*
+
+-   Checking out NaN values in dataset
+
+    ```{r}
+    colSums(is.na(data))
+    ```
+
+## Handling Missing Values
+
+-   For "reviews_per_month," missing values are replaced with the mean value of the column.
+
+-   For "last_review," missing values are replaced with the median date. Note that the date is converted to the "Date" type before calculating the median and then converted back to the "Date" type.
+
+```{r}
+# Impute missing values for reviews_per_month with the mean
+data$reviews_per_month[is.na(data$reviews_per_month)] <- mean(data$reviews_per_month, na.rm = TRUE)
+
+# Impute missing values for last_review with the median date
+data$last_review[is.na(data$last_review)] <- as.Date(median(as.Date(data$last_review, "%Y-%m-%d"), na.rm = TRUE), origin = "1970-01-01")
+
+# Checking missing values
+colSums(is.na(data))
+```
+
+## II. Summary Statistics
+
+Explore the dataset by calculating appropriate summary statistics of each feature. For numeric features, compute mean, median, mode, variance, standard deviation, 25%, 75% quantiles, etc. For categorical data, compute mode.
+
+### Summary Statistics of Numerical Values
+
+-   **Numerical Feature:** The Summary Statistics will contain *mean, median, mode, variance, standard deviation, 25%, 75% quantiles, Minimum and Maximum, range, IQR*
+
+    ```{r}
+    # Summary statistics of all the numerical features
+
+    # Previously from numerical_columns - extracting the names
+    numerical_features <- names(data[, numerical_columns])
+
+    # For each feature we will be generating the summary statistics
+    for (numerical_feature in numerical_features){
+      cat("Summary Statistics of ", numerical_feature, '\n')
+      cat("---------------------------------------------------------------------------\n\n")
+      
+      # numerical data
+      numerical_data = data[, numerical_feature]
+      
+      # Finding Mode
+      # Retrieve unique values
+      ux = unique(numerical_data)
+      # After counting the occurances on tabulate we find the maximum on which is the node
+      mode <- ux[which.max(tabulate(match(numerical_data, ux)))]
+      
+      # summary function will generate minimum, mean, 25% quantile, median, 75% quantile, max
+      print(summary(numerical_data))
+      
+      # Finding additional summary containing mode, variance, standard deviation, range and IQR
+      cat("\nMode: ", mode, '\n')
+      cat("Variance: ", var(numerical_data), '\n')
+      cat("Standard Deviation: ", sd(numerical_data), '\n')
+      cat("Range: ", range(numerical_data), '\n')
+      cat("Interquartile Range: ", IQR(numerical_data), '\n\n\n')
+    }
+    ```
+
+    ## Summary Statistics of Categorical Values
+
+-   **Categorical Feature:** The Summary Statistics will contain *Mode* and *total listing count* per neighbourhood_group, *total listing count* *per room_type*.
+
+    ```{r}
+    # Summary statistics of all the categorical features
+
+    # Previously from categorical_columns - extracting the names
+    categorical_features <- names(data[, categorical_columns])
+
+    # For each feature we will be generating the summary statistics
+    for (categorical_feature in categorical_features){
+      cat("Summary Statistics of ", categorical_feature, '\n')
+      cat("---------------------------------------------------------------------------\n")
+      
+      # categorical data
+      categorical_data = data[, categorical_feature]
+      
+      # Finding Mode
+      # Retrieve unique values
+      ux = unique(categorical_data)
+      # After counting the occurances on tabulate we find the maximum on which is the node
+      mode <- ux[which.max(tabulate(match(categorical_data, ux)))]
+      
+      
+      # Finding summary containing mode
+      cat("\nMode: ", mode, '\n\n')
+    }
+
+    # Total Listing count per neighbourhood group
+    cat("Total Listing Count Per Neighbourhood Group: \n\n")
+    tapply(data$id, INDEX = data$neighbourhood_group, FUN = sum)
+    cat("\n\n")
+
+    # Total Listing count per room type
+    cat("Total Listing Count Per Room Type: \n\n")
+    tapply(data$id, INDEX = data$room_type, FUN = sum)
+    cat("\n\n")
+    ```
+
+# Implementation: Data Visualization
+
+## Summary Statistics
+
+### Distribution of Price
+
+```{r}
+# 1. Histogram
+ggplot(data, aes(x = price)) +
+  geom_histogram(binwidth = 140, fill = "blue", color = "black") +
+  labs(title = "Distribution of Price", x = "Price", y = "Frequency")
+```
+
+```{r}
+ggplot(data, aes(x = price)) +
+  geom_density(fill = "orange") +
+  labs(title = "Density Plot of Price", x = "Price", y = "Density")
+```
+
+```{r}
+# Calculate skewness of the 'price' variable
+skewness_price <- skewness(data$price)
+
+# Print the skewness value
+cat("Skewness of Price:", skewness_price, "\n")
+```
+
+The peak price falls within 140-280. A skewness value of 19.11777 is extremely high and indicates a significant positive skewness (right skewness) in the distribution of prices. It suggests that there might be a few listings with extremely high prices, leading to the right skewness. To make the distribution more symmetric, we are performing log transformation for clear analysis.
+
+```{r}
+# Log transformation of 'price'
+data$log_price <- log1p(data$price)
+
+# Calculate skewness of the log-transformed 'price' variable
+skewness_log_price <- skewness(data$log_price, na.rm = TRUE)
+
+# Print the skewness value
+cat("Skewness of Log-Transformed Price:", skewness_log_price, "\n")
+
+```
+
+The skewness is closer to 0. Now if we visualize the distribution with histogram again it will be somewhat perfect.
+
+```{r}
+# 1. Histogram
+ggplot(data, aes(x = log_price)) +
+  geom_histogram(binwidth = 0.1, fill = "orange", color = "cyan") +
+  labs(title = "Distribution of Price", x = "Log Price", y = "Frequency")
+```
+
+### Outliers Detection
+
+#### Box Plots for Numerical Features
+
+```{r}
+# Boxplot for each numerical feature
+par(mfrow=c(1, 1))  # Adjust the layout based on the number of features
+for (feature in numerical_features) {
+  boxplot(data[[feature]], main=feature, col="skyblue", border="black")
+}
+```
+
+In some of these box plots like calculated_host_listings_count, reviews_per_month, number_of_reviews, availability_365, minimum_nights show only a straight line or lack whiskers. It could indicate that there might be extreme outliers in data that are affecting the scale of the boxplot
+
+#### Bar Plots for categorical feature
+
+```{r}
+# Assuming your data frame is named 'df'
+# and categorical_features contains the names of your categorical columns
+
+categorical_features <- c("neighbourhood_group", "neighbourhood", "room_type")
+
+# Barplot for each categorical feature
+par(mfrow=c(1, 1))  # Adjust the layout based on the number of features
+for (feature in categorical_features) {
+  barplot(table(data[[feature]]), main=feature, col="red", border="black")
+}
+
+```
+
+The distribution of neighbourhood_group and room_type can have some imbalance as some of the bars are too low.
+
+### Distribution of Longitude, Latitude
+
+```{r}
+# 4. Scatter Plot
+ggplot(data, aes(x = longitude, y = latitude, color = log_price)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "Scatter Plot of listings", x = "longitude", y = "latitude", color = "Price")
+```
+
+```{r}
+# Calculate the correlation coefficient
+correlation_longitude_latitude <- cor(data$longitude, data$latitude)
+
+# Print the correlation coefficient
+print(paste("Correlation between Longitude and Latitude: ", correlation_longitude_latitude))
+```
+
+A correlation close to zero indicates a weak linear relationship between the two variables. Hence there are no correlation between the longitude and latitude.
+
+### Correlation Heatmap
+
+```{r}
+correlation_matrix <- cor(data[, c("price", "minimum_nights", "number_of_reviews", "availability_365", "reviews_per_month", "calculated_host_listings_count")])
+ggplot(data = melt(correlation_matrix), aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  labs(title = "Correlation Heatmap", x = "Variables", y = "Variables", fill = "Correlation")
+```
+
+From this heatmap we can see some correlation between
+
+-   number of reviews and reviews per month
+
+```{r}
+ggplot(data, aes(x = number_of_reviews, y = reviews_per_month, color = log_price)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "Scatter Plot of listings", x = "longitude", y = "latitude", color = "Price")
+```
+
+```{r}
+# Calculate the correlation coefficient
+correlation_numofReview_reviewPermonth <- cor(data$number_of_reviews, data$reviews_per_month)
+
+# Print the correlation coefficient
+print(paste("Correlation between number_of_reviews and reviews_per_month: ", correlation_numofReview_reviewPermonth))
+```
+
+**Interpretation:** The correlation coefficient between number_of_reviews and reviews_per_month is approximately 0.53. This positive correlation value suggests a moderate positive linear relationship between the two variables. Listings with a higher total number of reviews tend to also have a higher average number of reviews per month. This could be expected, as popular listings with more total reviews are likely to continue receiving reviews at a relatively steady rate over time.
+
+-   Listings with a higher total number of reviews may be more popular or have been available for a longer period, contributing to a higher average number of reviews per month.
+
+-   Active engagement with guests over time may lead to both a higher total number of reviews and a sustained monthly review rate.
+
+## Insights on Different Hosts and Areas
+
+### **Distribution of Listings Across Neighborhoods:**
+
+```{r}
+# bar plot for the distribution of hosts across neighborhood groups
+ggplot(data = data, aes(x = neighbourhood_group)) +
+  geom_bar(fill = "darkblue") +
+  labs(title = "Distribution of Listings Across Neighborhood Groups",
+       x = "Neighborhood Group",
+       y = "Number of Listings")
+```
+
+-   'Manhattan' has the highest number of listings
+
+-   'Staten Island' has the lowest number of listings
+
+#### Most Popular Area in Manhattan based on total listings per host
+
+```{r}
+# Filter data for Manhattan
+manhattan_data <- data[data$neighbourhood_group == "Manhattan", ]
+
+# Find the most popular area based on calculated_host_listings_count
+most_popular_area_calculated_host <- manhattan_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_listings = sum(calculated_host_listings_count)) %>%
+  arrange(desc(total_listings)) %>%
+  head(1)
+
+most_popular_area_calculated_host
+```
+
+#### Most Popular Area in Manhattan based on number of reviews
+
+```{r}
+# Find the most popular area based on number_of_reviews
+most_popular_area_reviews <- manhattan_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_reviews = sum(number_of_reviews)) %>%
+  arrange(desc(total_reviews)) %>%
+  head(1)
+
+most_popular_area_reviews
+```
+
+#### Most Popular Area in Manhattan based on number of reviews and list count
+
+```{r}
+# Filter data for Manhattan
+manhattan_data <- data[data$neighbourhood_group == "Manhattan", ]
+
+# Create a new variable for combined popularity score
+manhattan_data <- manhattan_data %>%
+  mutate(popularity_score = calculated_host_listings_count + number_of_reviews)
+
+# Find the most popular area in Manhattan based on the combined score
+most_popular_area_manhattan <- manhattan_data %>%
+  group_by(neighbourhood) %>%
+  summarise(combined_score = sum(popularity_score)) %>%
+  arrange(desc(combined_score)) %>%
+  head(1)
+
+most_popular_area_manhattan
+
+```
+
+The Financial District stands out as a popular area for Airbnb listings, both in terms of the number of listings per host and the combined measure of reviews and listings. Hosts in this area may have a successful presence in the Airbnb market.
+
+Harlem's popularity, as indicated by the number of reviews, highlights it as an area where guests are actively engaging, potentially attracted by the offerings and experiences in this neighborhood.
+
+### Analyze the factors that make the most popular area
+
+```{r}
+# Explore other variables for the most popular area in Manhattan
+most_popular_area_details <- manhattan_data[manhattan_data$neighbourhood == most_popular_area_manhattan$neighbourhood, ]
+
+# Create a KDE plot for the distribution of room types in the most popular area
+ggplot(data = most_popular_area_details, aes(x = room_type, y = ..density.., fill = room_type)) +
+  geom_density(alpha = 0.5, color = "black") +
+  labs(title = "Room Type Distribution in Most Popular Area (Manhattan)",
+       x = "Room Type",
+       y = "Density") +
+  scale_fill_manual(values = c("skyblue", "lightgreen", "salmon"))
+```
+
+Kernel Density Estimate here says -
+
+-   right-skewed distribution for the "Entire home/apt" room type. Indicates that there are a few hosts with a significantly higher number of listings, creating a long tail on the right side of the distribution.
+
+-   normal distribution for the "Private room" room type. Meaning more balanced distribution of listings with a private room, with a relatively consistent count across different hosts.
+
+-   a flatter or less distinct distribution for the "Shared room" type. Meaning not as concentrated around a specific count per host, and the distribution is more spread out.
+
+**Overall Reason for Popularity:**\
+In the most popular area of Manhattan, the hosting landscape is characterized by a right-skewed distribution for entire homes/apartments, indicating a few hosts manage a significant number of these accommodations, potentially meeting high demand. Private rooms show a normal distribution, suggesting a balanced presence across hosts. Shared rooms exhibit a flatter distribution, hinting at a more diverse and less concentrated market for this type of lodging. These patterns reflect a nuanced hosting market in the most popular area, where a mix of host strategies caters to varied guest preferences, emphasizing the dominance of private accommodations and a more scattered presence of shared spaces.
+
+#### Least Popular Area in Manhattan based on total listings per host
+
+```{r}
+# Filter data for Manhattan
+manhattan_data <- data[data$neighbourhood_group == "Manhattan", ]
+
+# Find the least popular area based on calculated_host_listings_count
+least_popular_area_calculated_host <- manhattan_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_listings = sum(calculated_host_listings_count)) %>%
+  arrange(total_listings) %>%
+  head(1)
+
+least_popular_area_calculated_host
+```
+
+#### Least Popular Area in Manhattan based on number of reviews
+
+```{r}
+# Find the least popular area based on number_of_reviews
+least_popular_area_reviews <- manhattan_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_reviews = sum(number_of_reviews)) %>%
+  arrange(total_reviews) %>%
+  head(1)
+
+least_popular_area_reviews
+```
+
+Marble Hill is the least popular area in Manhattan based on number of reviews and total listing per host.
+
+### Analyze the factors that make the least popular area in Manhattan
+
+```{r}
+# Explore other variables for the least popular area in Manhattan
+least_popular_area_details <- manhattan_data[manhattan_data$neighbourhood == least_popular_area_calculated_host$neighbourhood, ]
+
+# Create a KDE plot for the distribution of room types in the least popular area
+ggplot(data = least_popular_area_details, aes(x = room_type, y = ..density.., fill = room_type)) +
+  geom_density(alpha = 0.5, color = "black") +
+  labs(title = "Room Type Distribution in Least Popular Area (Manhattan)",
+       x = "Room Type",
+       y = "Density") +
+  scale_fill_manual(values = c("skyblue", "lightgreen", "salmon"))
+```
+
+Kernel Density Estimate here says -
+
+-   right-skewed distribution for the "Entire home/apt" room type. Indicating that most hosts have a relatively low number of listings per host, with a few hosts having a significantly higher number of listings.
+
+-   a flatter or less distinct distribution for the "Private room" room type. Meaning a scattered count per host for private rooms.
+
+**Overall Reason for Least Popularity:**\
+The sharp decline in density for "Entire home/apt" from 0.6 to 0.2 suggests a substantial decrease in the count of entire homes or apartments per host, indicating a diminished demand for this accommodation type. Meanwhile, the flatter or less distinct distribution for "Private room," which increased from 0.2 to 0.35, implies a scattered count per host for private rooms, indicating a lack of concentration or popularity compared to other areas. These observed shifts in room type distributions collectively point to Marble Hill's status as the least popular area, characterized by reduced demand for entire homes/apartments and a less defined distribution of private rooms among hosts, contributing to a less competitive or sought-after market in this neighborhood.
+
+#### Most Popular Area in Staten Island based on total listings per host
+
+```{r}
+# Filter data for Staten Island
+staten_island_data <- data[data$neighbourhood_group == "Staten Island", ]
+
+# Find the most popular area based on calculated_host_listings_count
+most_popular_area_calculated_host_in_Staten <- staten_island_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_listings = sum(calculated_host_listings_count)) %>%
+  arrange(desc(total_listings)) %>%
+  head(1)
+
+most_popular_area_calculated_host_in_Staten
+```
+
+#### Most Popular Area in Staten Island based on number of reviews
+
+```{r}
+# Find the most popular area based on number_of_reviews
+most_popular_area_reviews_staten <- staten_island_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_reviews = sum(number_of_reviews)) %>%
+  arrange(desc(total_reviews)) %>%
+  head(1)
+
+most_popular_area_reviews_staten
+```
+
+#### Most Popular Area in Staten Island based on number of reviews and list count
+
+```{r}
+# Create a new variable for combined popularity score
+staten_island_data <- staten_island_data %>%
+  mutate(popularity_score = calculated_host_listings_count + number_of_reviews)
+
+# Find the most popular area in Staten Island based on the combined score
+most_popular_area_staten <- staten_island_data %>%
+  group_by(neighbourhood) %>%
+  summarise(combined_score = sum(popularity_score)) %>%
+  arrange(desc(combined_score)) %>%
+  head(1)
+
+most_popular_area_staten
+
+```
+
+The 'Tompkinsville' stands out as a popular area in Staten Island for Airbnb listings, both in terms of the number of listings per host and the combined measure of reviews and listings. Hosts in this area may have most reviews in the Airbnb market.
+
+Concord's popularity, as indicated by the total number of listings per host, highlights it as an area where it has the most presence in this neighborhood.
+
+### Analyze the factors that make the most popular area
+
+```{r}
+# Explore other variables for the most popular area in Staten Island
+most_popular_area_details_staten <- staten_island_data[staten_island_data$neighbourhood == most_popular_area_staten$neighbourhood, ]
+
+# Create a KDE plot for the distribution of room types in the most popular area
+ggplot(data = most_popular_area_details_staten, aes(x = room_type, y = ..density.., fill = room_type)) +
+  geom_density(alpha = 0.5, color = "black") +
+  labs(title = "Room Type Distribution in Most Popular Area (Staten Island)",
+       x = "Room Type",
+       y = "Density") +
+  scale_fill_manual(values = c("skyblue", "lightgreen", "salmon"))
+```
+
+Kernel Density Estimate here says -
+
+-   Right-skewed distribution for the "Entire home/apt" room type. Indicates that there are a few hosts with a significantly higher number of listings, creating a long tail on the right side of the distribution.
+
+-   Left-skewed distribution for the "Private room" room type. In the context of room types, it implies that there are relatively fewer hosts with lower number of listings and more hosts with higher number of listings.
+
+**Overall Reason for Popularity:**\
+The popularity of 'Tompkinsville' in Staten Island is driven by hosts with a high number of reviews, indicating guest satisfaction. Meanwhile, 'Concord' stands out for having the most extensive presence in terms of total listings per host. The distribution of room types reveals a concentration of hosts with significantly more listings for "Entire home/apt," creating a right-skewed pattern. Conversely, a left-skewed distribution for "Private room" suggests a higher concentration of hosts with more listings in these neighborhoods. These insights reflect diverse hosting strategies and market dynamics, making 'Tompkinsville' and 'Concord' noteworthy areas for both guests and hosts in the Staten Island Airbnb market.
+
+#### Least Popular Area in Staten Island based on total listings per host
+
+```{r}
+# Find the least popular area based on calculated_host_listings_count
+least_popular_area_calculated_host_staten <- staten_island_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_listings = sum(calculated_host_listings_count)) %>%
+  arrange(total_listings) %>%
+  head(1)
+
+least_popular_area_calculated_host_staten
+```
+
+#### Least Popular Area in Staten Island based on number of reviews
+
+```{r}
+# Find the least popular area based on number_of_reviews
+least_popular_area_reviews_staten <- staten_island_data %>%
+  group_by(neighbourhood) %>%
+  summarise(total_reviews = sum(number_of_reviews)) %>%
+  arrange(total_reviews) %>%
+  head(1)
+
+least_popular_area_reviews_staten
+```
+
+As we can see in the Staten Island which is the least popular neighbourhood group has 'New Drop' group with only 1 listing per host. And 'Fort Wadsworth' has the lowest of reviews which is 0.
+
+**Overall Reason for Least Popularity:**\
+In Staten Island, the least popular neighborhood group is exemplified by areas like 'New Drop,' characterized by hosts offering only one listing each. Additionally, 'Fort Wadsworth' stands out with the lowest number of reviews, registering at zero. The limited availability in 'New Drop' and the absence of reviews in 'Fort Wadsworth' contribute to their status as the least popular areas, suggesting potential areas for improvement in terms of appeal, amenities, and guest engagement for hosts in these neighborhoods.
+
+## Insights on Busiest Hosts
+
+To find the busiest host we will look at the hosts with maximum number of hosts. Then we will look for the hosts that have long number of days when their listing is available for booking. The maximum number of waiting days for a listing indicates the busyness of that host. Still we will analyze it's maximum number of listings as well.
+
+### **Top 10 Hosts with Highest Number of Listings**
+
+```{r}
+# Assuming 'data' is your dataset
+
+top_hosts <- data %>%
+  group_by(host_id, host_name) %>%
+  summarise(max_listings = max(calculated_host_listings_count)) %>%
+  arrange(desc(max_listings)) %>%
+  head(10)
+
+print(top_hosts)
+```
+
+### Top 10 Hosts with long number of days when their listing is available for booking.
+
+```{r}
+# Assuming you have the 'top_hosts' data frame from the previous code snippet
+
+# Join the 'top_hosts' data frame with the original 'data' to get complete information
+top_hosts_data <- left_join(top_hosts, data, by = c("host_id" = "host_id"))
+
+# Bar plot for Top Hosts with Highest availability_365
+ggplot(top_hosts_data, aes(x = reorder(host_id, -availability_365), y = availability_365, fill = factor(host_id))) +
+  geom_bar(stat = "identity", color = "cyan") +
+  labs(title = "Top Hosts with Highest availability_365",
+       x = "Host ID",
+       y = "Availability (in days)",
+       fill = "Host ID") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+```
+
+From the visualization of number of waiting days and total number of listings of a host, both analysis interpret that host **Sonder (NYC)** is the busiest host. There are also other busy hosts such as **Blueground, Kara, Kazuya** etc.
+
+### Factors like Location, Competitive Price and Number of reviews on Busyness
+
+### Location
+
+```{r}
+# 1. Filter Data for Selected Hosts
+selected_hosts <- c('Sonder (NYC)', 'Blueground', 'Kara', 'Kazuya', 'Sonder', 'Jeremy & Laura', 'Corporate Housing', 'Ken', 'Pranjal', 'Mike')  
+filtered_data <- data[data$host_name %in% selected_hosts, ]
+
+# 2. Explore Location Factors
+ggplot(filtered_data, aes(x = neighbourhood_group, fill = host_name)) +
+  geom_bar(position = "dodge") +
+  labs(title = 'Distribution of Listings Across Neighborhood Groups for Selected Hosts',
+       x = 'Neighborhood Group',
+       y = 'Count') +
+  theme_minimal()
+```
+
+From the analysis of Popular area, we have already found out Manhattan is the most popular area. In this visualization Manhattan also has the maximum hosts and the busiest host. It is also another reason for the popularity. And the popularity itself is the reason for Sonder(NYC) to be the busiest of all. Because popularity attracts.
+
+#### Competitive Price
+
+By examining the spread of jittered points around the boxplot, we can observe the variability in pricing for each host. A wider spread indicates a greater diversity in pricing.
+
+```{r}
+# 3. Analyze Pricing Strategies
+ggplot(filtered_data, aes(x = host_name, y = log_price, fill = host_name)) +
+  geom_boxplot() +
+  scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+  geom_jitter(color="black", size=0.4, alpha=0.9) +
+  theme_ipsum() +
+  theme(
+    legend.position="none",
+    plot.title = element_text(size=11)
+  )+
+  labs(title = 'Pricing Distribution for Selected Hosts with Jitter',
+       x = 'Host Name',
+       y = 'Price (in dollars)') +
+  theme_minimal()
+```
+
+-   **Median Comparison:** The median of **Blueground** looks higher and **Kazuya** looks lower. Which indicates on average the Blueground has higher prices and Kazuya has lower prices. Sonder (NYC) prices falls approximately in the middle.
+
+-   **Spread of Prices:** **Mike** has the wider box while **Kazuya** has the narrower box. The jitters are spread widlely Which indicates Mike has variety of price ranges while kazuya has lower variety. Sonder(NYC) has also some varieties.
+
+    Hence the busiest host Sonder(NYC) has somewhat competitive price ranges. But not so competitive either which can be affordable to many customers.
+
+    #### Number of Reviews
+
+```{r}
+# 4. Review Positive Reviews
+ggplot(filtered_data, aes(x = host_name, y = number_of_reviews, fill = host_name)) +
+  stat_summary(fun = sum, geom = "bar", position = "dodge") +
+  labs(title = 'Total Number of Reviews for Selected Hosts',
+       x = 'Host Name',
+       y = 'Total Number of Reviews') +
+  theme_minimal()
+```
+
+This visualization however turns the event. The 10th busy host has the significantly maximum number of reviews(Over 4000) whereas the busiest host "Sonder(NYC)" has the 2nd maximum number of reviews(Around 1300). If we look back to the previous graphs, Mike has listings in all neighbourhood groups including having 4th most listings in the popular area "Manhattan". It can lead to higher occupancy rates. In the box plot Mike also have the most variety price ranges. It attract more guests and encourage them to leave positive reviews. Hence these could be the reasons of **Mike** having most number of reviews.
+
+# Conclusion
+
+The analysis of the Airbnb dataset reveals valuable insights into various aspects of the hosting landscape. The examination of summary statistics and visualization techniques provides a comprehensive understanding of the data, identifying outliers, distributions, and correlations. The study uncovers patterns in the popularity and least popularity of areas, highlighting the influence of room types and host strategies. Notably, Manhattan emerges as a hub with the most listings, showcasing the Financial District as a particularly popular area. The correlation analysis indicates a positive relationship between the total number of reviews and the average reviews per month, suggesting sustained guest engagement over time. The exploration of the busiest hosts reveals Sonder (NYC) as a standout, influenced by factors like competitive pricing, location, and the overall popularity of the hosting market. Additionally, the study delves into the least popular areas, such as Marble Hill in Manhattan and New Drop in Staten Island, providing insights into their unique challenges and characteristics. The findings collectively contribute to a nuanced understanding of the Airbnb ecosystem, offering valuable information for hosts, guests, and stakeholders in the platform.
